@@ -167,6 +167,17 @@ func (f *File) AddSheet(sheetName string) (*Sheet, error) {
 	return sheet, nil
 }
 
+// DeleteSheet removes sheet with the provided name
+func (f *File) DeleteSheet(sheetName string) {
+	delete(f.Sheet, sheetName)
+	for i, sheet := range f.Sheets {
+		if sheet.Name == sheetName {
+			f.Sheets = append(f.Sheets[:i], f.Sheets[i+1:]...)
+			return
+		}
+	}
+}
+
 // Appends an existing Sheet, with the provided name, to a File
 func (f *File) AppendSheet(sheet Sheet, sheetName string) (*Sheet, error) {
 	if _, exists := f.Sheet[sheetName]; exists {
@@ -178,6 +189,17 @@ func (f *File) AppendSheet(sheet Sheet, sheetName string) (*Sheet, error) {
 	f.Sheet[sheetName] = &sheet
 	f.Sheets = append(f.Sheets, &sheet)
 	return &sheet, nil
+}
+
+// DefineName adds a named range to the sheet
+func (f *File) DefineName(sheetName, name string, beginX, beginY, endX, endY int) {
+	beginXalpha := ColIndexToLetters(beginX)
+	endXalpha := ColIndexToLetters(endX)
+
+	f.DefinedNames = append(f.DefinedNames, &xlsxDefinedName{
+		Name: name,
+		Data: fmt.Sprintf("'%s'!$%s$%d:$%s$%d", sheetName, beginXalpha, beginY+1, endXalpha, endY+1),
+	})
 }
 
 func (f *File) makeWorkbook() xlsxWorkbook {
@@ -279,6 +301,10 @@ func (f *File) MarshallParts() (map[string]string, error) {
 			return parts, err
 		}
 		sheetIndex++
+	}
+
+	for _, definedName := range f.DefinedNames {
+		workbook.DefinedNames.DefinedName = append(workbook.DefinedNames.DefinedName, *definedName)
 	}
 
 	workbookMarshal, err := marshal(workbook)
