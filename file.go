@@ -151,19 +151,30 @@ func (f *File) Write(writer io.Writer) (err error) {
 
 // Add a new Sheet, with the provided name, to a File
 func (f *File) AddSheet(sheetName string) (*Sheet, error) {
+	return f.AddSheetAt(-1, sheetName)
+}
+
+// Add a new Sheet, with the provided name, to a File
+func (f *File) AddSheetAt(idx int, sheetName string) (*Sheet, error) {
 	if _, exists := f.Sheet[sheetName]; exists {
 		return nil, fmt.Errorf("duplicate sheet name '%s'.", sheetName)
 	}
 	if len(sheetName) >= 31 {
 		return nil, fmt.Errorf("sheet name must be less than 31 characters long.  It is currently '%d' characters long", len(sheetName))
 	}
+
 	sheet := &Sheet{
 		Name:     sheetName,
 		File:     f,
 		Selected: len(f.Sheets) == 0,
 	}
+
+	if idx < 0 {
+		idx = len(f.Sheets)
+	}
+
 	f.Sheet[sheetName] = sheet
-	f.Sheets = append(f.Sheets, sheet)
+	f.Sheets = append(f.Sheets[:idx], append([]*Sheet{sheet}, f.Sheets[idx:]...)...)
 	return sheet, nil
 }
 
