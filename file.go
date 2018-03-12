@@ -213,6 +213,18 @@ func (f *File) DefineName(sheetName, name string, beginX, beginY, endX, endY int
 	})
 }
 
+// DeleteDefinedName deletes named range
+func (f *File) DeleteDefinedName(name string) {
+	names := []*xlsxDefinedName{}
+	for _, n := range f.DefinedNames {
+		if n.Name != name {
+			names = append(names, n)
+		}
+	}
+
+	f.DefinedNames = names
+}
+
 func (f *File) makeWorkbook() xlsxWorkbook {
 	return xlsxWorkbook{
 		FileVersion: xlsxFileVersion{AppName: "Go XLSX"},
