@@ -151,20 +151,42 @@ func (f *File) Write(writer io.Writer) (err error) {
 
 // Add a new Sheet, with the provided name, to a File
 func (f *File) AddSheet(sheetName string) (*Sheet, error) {
+	return f.AddSheetAt(-1, sheetName)
+}
+
+// Add a new Sheet, with the provided name, to a File
+func (f *File) AddSheetAt(idx int, sheetName string) (*Sheet, error) {
 	if _, exists := f.Sheet[sheetName]; exists {
 		return nil, fmt.Errorf("duplicate sheet name '%s'.", sheetName)
 	}
 	if len(sheetName) >= 31 {
 		return nil, fmt.Errorf("sheet name must be less than 31 characters long.  It is currently '%d' characters long", len(sheetName))
 	}
+
 	sheet := &Sheet{
 		Name:     sheetName,
 		File:     f,
 		Selected: len(f.Sheets) == 0,
 	}
+
+	if idx < 0 {
+		idx = len(f.Sheets)
+	}
+
 	f.Sheet[sheetName] = sheet
-	f.Sheets = append(f.Sheets, sheet)
+	f.Sheets = append(f.Sheets[:idx], append([]*Sheet{sheet}, f.Sheets[idx:]...)...)
 	return sheet, nil
+}
+
+// DeleteSheet removes sheet with the provided name
+func (f *File) DeleteSheet(sheetName string) {
+	delete(f.Sheet, sheetName)
+	for i, sheet := range f.Sheets {
+		if sheet.Name == sheetName {
+			f.Sheets = append(f.Sheets[:i], f.Sheets[i+1:]...)
+			return
+		}
+	}
 }
 
 // Appends an existing Sheet, with the provided name, to a File
@@ -178,6 +200,29 @@ func (f *File) AppendSheet(sheet Sheet, sheetName string) (*Sheet, error) {
 	f.Sheet[sheetName] = &sheet
 	f.Sheets = append(f.Sheets, &sheet)
 	return &sheet, nil
+}
+
+// DefineName adds a named range to the sheet
+func (f *File) DefineName(sheetName, name string, beginX, beginY, endX, endY int) {
+	beginXalpha := ColIndexToLetters(beginX)
+	endXalpha := ColIndexToLetters(endX)
+
+	f.DefinedNames = append(f.DefinedNames, &xlsxDefinedName{
+		Name: name,
+		Data: fmt.Sprintf("'%s'!$%s$%d:$%s$%d", sheetName, beginXalpha, beginY+1, endXalpha, endY+1),
+	})
+}
+
+// DeleteDefinedName deletes named range
+func (f *File) DeleteDefinedName(name string) {
+	names := []*xlsxDefinedName{}
+	for _, n := range f.DefinedNames {
+		if n.Name != name {
+			names = append(names, n)
+		}
+	}
+
+	f.DefinedNames = names
 }
 
 func (f *File) makeWorkbook() xlsxWorkbook {
@@ -279,6 +324,10 @@ func (f *File) MarshallParts() (map[string]string, error) {
 			return parts, err
 		}
 		sheetIndex++
+	}
+
+	for _, definedName := range f.DefinedNames {
+		workbook.DefinedNames.DefinedName = append(workbook.DefinedNames.DefinedName, *definedName)
 	}
 
 	workbookMarshal, err := marshal(workbook)
