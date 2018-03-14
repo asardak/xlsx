@@ -169,7 +169,7 @@ func (f *File) AddSheetAt(idx int, sheetName string) (*Sheet, error) {
 		Selected: len(f.Sheets) == 0,
 	}
 
-	if idx < 0 {
+	if idx < 0 || idx > len(f.Sheets) {
 		idx = len(f.Sheets)
 	}
 
